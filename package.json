@@ -19,7 +19,6 @@
   },
   "scripts": {
       "preinstall": "echo Installing Puppeteer and Chromium...",
-      "postinstall": "npx puppeteer install",
       "start": "node server.js"
   }
 }

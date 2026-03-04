@@ -18,6 +18,7 @@ app.get("/extract", async (req, res) => {
         const browser = await puppeteer.launch({
             headless: true,
             args: ["--no-sandbox", "--disable-setuid-sandbox"], 
+            executablePath: "/usr/bin/chromium-browser" 
         });
 
         console.log("STEP 2: Opening new page...");
