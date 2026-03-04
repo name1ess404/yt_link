@@ -80,6 +80,11 @@ app.get("/extract", async (req, res) => {
     }
 });
 
+app.get("/ping", (req, res) => {
+  res.send("OK"); // tiny response, nothing heavy
+});
+
+
 app.listen(PORT, () => {
     console.log(`Server running on http://localhost:${PORT}`);
 });
