@@ -18,8 +18,7 @@
     "node": "18.x"
   },
   "scripts": {
-      "preinstall": "echo Installing Puppeteer and Chromium...",
-      "postinstall": "npx puppeteer install",
-      "start": "node server.js"
+      "start": "node server.js",
+      "build": "npm install && npx puppeteer browsers install chrome"
   }
 }
