@@ -14,24 +14,37 @@ app.get("/extract", async (req, res) => {
 
     try {
         console.log("STEP 1: Launching browser...");
-
         const browser = await puppeteer.launch({
-            headless: true,
-            args: ["--no-sandbox", "--disable-setuid-sandbox"]
+            headless: "new",
+            args: [
+                "--no-sandbox", 
+                "--disable-setuid-sandbox",
+                "--disable-dev-shm-usage", // Highly recommended for Render
+                "--disable-gpu"
+            ]
         });
 
         console.log("STEP 2: Opening new page...");
         const page = await browser.newPage();
+        
+        // --- ADDED TIMEOUTS HERE (90 Seconds) ---
+        await page.setDefaultNavigationTimeout(90000); 
+        await page.setDefaultTimeout(90000); 
 
         console.log("STEP 3: Setting cookies...");
         const cookies = JSON.parse(process.env.COOKIES_JSON);
         await page.setCookie(...cookies);
 
         console.log("STEP 4: Going to class URL...");
-        await page.goto(classUrl, { waitUntil: "networkidle2" });
+        // Changed to 'domcontentloaded' for better reliability on slow connections
+        await page.goto(classUrl, { 
+            waitUntil: "domcontentloaded", 
+            timeout: 90000 
+        });
 
         console.log("STEP 5: Waiting for iframe...");
-        await page.waitForSelector("iframe", { timeout: 60000 });  // 60 seconds
+        // This will now wait up to 90 seconds if needed
+        await page.waitForSelector("iframe", { timeout: 90000 }); 
 
         console.log("STEP 6: Extracting iframe src...");
         const iframeSrc = await page.evaluate(() => {
@@ -57,7 +70,9 @@ app.get("/extract", async (req, res) => {
 
     } catch (err) {
         console.error("ERROR OCCURRED:", err);
-        res.status(500).json({ error: "Something went wrong" });
+        // Important: Close browser even if it fails to prevent memory leaks
+        if (typeof browser !== 'undefined') await browser.close();
+        res.status(500).json({ error: "Something went wrong", details: err.message });
     }
 });
 
