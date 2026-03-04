@@ -42,11 +42,15 @@ app.get("/extract", async (req, res) => {
             timeout: 90000 
         });
 
-        console.log("STEP 5: Waiting for iframe...");
-        // This will now wait up to 90 seconds if needed
-        await page.waitForSelector("iframe", { timeout: 90000 }); 
-
+        console.log("STEP 5: Waiting for YouTube iframe...");
+        
+        await page.waitForFunction(() => {
+            const iframe = document.querySelector("iframe");
+            return iframe && iframe.src && iframe.src.includes("youtube");
+        }, { timeout: 90000 });
+        
         console.log("STEP 6: Extracting iframe src...");
+        
         const iframeSrc = await page.evaluate(() => {
             const iframe = document.querySelector("iframe");
             return iframe ? iframe.src : null;
