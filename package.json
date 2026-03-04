@@ -19,6 +19,7 @@
   },
   "scripts": {
       "prestart": "rm -rf /opt/render/.cache/puppeteer",
+      "prestart": "npx puppeteer install",
       "start": "node server.js"
   }
 }
