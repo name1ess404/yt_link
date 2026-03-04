@@ -16,5 +16,9 @@
   },
   "engines": {
     "node": "18.x"
+  },
+  "scripts": {
+      "prestart": "rm -rf /opt/render/.cache/puppeteer",
+      "start": "node server.js"
   }
 }
