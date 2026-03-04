@@ -23,7 +23,7 @@ app.get("/extract", async (req, res) => {
 
         const page = await browser.newPage();
 
-        const cookies = JSON.parse(fs.readFileSync("cookies.json"));
+        const cookies = JSON.parse(process.env.COOKIES_JSON);
         await page.setCookie(...cookies);
 
         await page.goto(classUrl, { waitUntil: "networkidle2" });
