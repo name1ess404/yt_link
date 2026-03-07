@@ -1,9 +1,16 @@
 const express = require("express");
 const puppeteer = require("puppeteer");
+const cors = require('cors');
 const fs = require("fs");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+
+app.use(cors());
+
+app.get("/ping", (req, res) => {
+  res.send("OK"); // tiny response, nothing heavy
+});
 
 app.get("/extract", async (req, res) => {
     const classUrl = req.query.url;
