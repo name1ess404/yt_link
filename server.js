@@ -1,7 +1,12 @@
+
+const WORKER_URL = "allowed-api.name1ess404.workers.dev";
+
+
+
+
 const express = require("express");
 const puppeteer = require("puppeteer");
 const cors = require('cors');
-const fs = require("fs");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -13,7 +18,28 @@ app.use(cors());
 app.use(express.json()); // needed for POST JSON parsing
 
 // ------------------ HELPER FUNCTIONS ------------------
-function loadAllowedDevices() {
+
+async function isAllowed(req) {
+
+    const deviceId = req.headers["x-device-id"];
+    if (!deviceId) return false;
+
+    try {
+
+        const res = await fetch(WORKER_URL + "/get");
+        const allowedDevices = await res.json();
+
+        return allowedDevices.includes(deviceId);
+
+    } catch (err) {
+        console.log("Worker error", err);
+        return false;
+    }
+}
+
+
+
+/*function loadAllowedDevices() {
     try {
         const data = fs.readFileSync("allowed.json", "utf8");
         return JSON.parse(data);
@@ -29,7 +55,7 @@ function isAllowed(req) {
 
     const allowedDevices = loadAllowedDevices(); // dynamic every request
     return allowedDevices.includes(deviceId);
-}
+}*/
 
 // ------------------ ADMIN ENDPOINT ------------------
 app.post('/allow-device', (req, res) => {
@@ -52,7 +78,7 @@ app.post('/allow-device', (req, res) => {
 
 // ------------------ PING ------------------
 app.get("/ping", (req, res) => {
-    if (!isAllowed(req)) {
+    if (!(await isAllowed(req))) {
         return res.status(403).json({ error: "UNAUTHORIZED", message: "Device not allowed" });
     }
     res.send("OK");
@@ -60,7 +86,7 @@ app.get("/ping", (req, res) => {
 
 // ------------------ EXTRACT ------------------
 app.get("/extract", async (req, res) => {
-    if (!isAllowed(req)) {
+    if (!(await isAllowed(req))) {
         return res.status(403).json({ error: "UNAUTHORIZED", message: "Device not allowed" });
     }
 
