@@ -2,17 +2,17 @@
 const WORKER_URL = "https://allowed-api.name1ess404.workers.dev";
 
 
-
-
 const express = require("express");
 const puppeteer = require("puppeteer");
 const cors = require('cors');
+
+const fetch = global.fetch;
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
 // ------------------ CONFIG ------------------
-const ADMIN_PASSWORD = process.env.ADMIN_PASS || "name0102less2010!@#";
+const ADMIN_PASSWORD = process.env.ADMIN_PASS || "mypass";
 
 app.use(cors());
 app.use(express.json()); // needed for POST JSON parsing
@@ -58,26 +58,9 @@ function isAllowed(req) {
 }*/
 
 // ------------------ ADMIN ENDPOINT ------------------
-app.post('/allow-device', (req, res) => {
-    const { deviceId, adminPass } = req.body;
-    if (adminPass !== ADMIN_PASSWORD) {
-        return res.json({ success: false, error: "Wrong password!" });
-    }
-
-    const allowedPath = './allowed.json';
-    let allowed = [];
-    if (fs.existsSync(allowedPath)) allowed = JSON.parse(fs.readFileSync(allowedPath));
-
-    if (!allowed.includes(deviceId)) {
-        allowed.push(deviceId);
-        fs.writeFileSync(allowedPath, JSON.stringify(allowed, null, 2));
-    }
-
-    res.json({ success: true });
-});
 
 // ------------------ PING ------------------
-app.get("/ping", (req, res) => {
+app.get("/ping", async (req, res) => {
     if (!(await isAllowed(req))) {
         return res.status(403).json({ error: "UNAUTHORIZED", message: "Device not allowed" });
     }
