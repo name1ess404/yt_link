@@ -3,16 +3,49 @@ const puppeteer = require("puppeteer");
 const cors = require('cors');
 const fs = require("fs");
 
+
+// --------------------- DYNAMIC DEVICE CHECK ---------------------
+
+function loadAllowedDevices() {
+    try {
+        const data = fs.readFileSync("allowed.json", "utf8");
+        return JSON.parse(data);
+    } catch (err) {
+        console.error("Failed to load allowed.json", err);
+        return [];
+    }
+}
+
+function isAllowed(req) {
+    const deviceId = req.headers["x-device-id"];
+    if (!deviceId) return false;
+
+    const allowedDevices = loadAllowedDevices(); // read every request
+    return allowedDevices.includes(deviceId);
+}
+// ---------------------------------------------------------------
+
+
 const app = express();
 const PORT = process.env.PORT || 3000;
 
 app.use(cors());
+
 
 app.get("/ping", (req, res) => {
   res.send("OK"); // tiny response, nothing heavy
 });
 
 app.get("/extract", async (req, res) => {
+
+	if (!isAllowed(req)) {
+        return res.status(403).json({
+            error: "UNAUTHORIZED",
+            message: "Device not allowed"
+        });
+    }
+	
+
     const classUrl = req.query.url;
 
     if (!classUrl) {
