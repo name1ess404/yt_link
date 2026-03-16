@@ -1,5 +1,5 @@
 
-const WORKER_URL = "allowed-api.name1ess404.workers.dev";
+const WORKER_URL = "https://allowed-api.name1ess404.workers.dev";
 
 
 
