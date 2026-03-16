@@ -31,10 +31,14 @@ const PORT = process.env.PORT || 3000;
 
 app.use(cors());
 
-
 app.get("/ping", (req, res) => {
+  if (!isAllowed(req)) {
+    return res.status(403).json({ error: "UNAUTHORIZED", message: "Device not allowed" });
+  }
   res.send("OK"); // tiny response, nothing heavy
 });
+
+
 
 app.get("/extract", async (req, res) => {
 
@@ -119,11 +123,6 @@ app.get("/extract", async (req, res) => {
         res.status(500).json({ error: "Something went wrong", details: err.message });
     }
 });
-
-app.get("/ping", (req, res) => {
-  res.send("OK"); // tiny response, nothing heavy
-});
-
 
 app.listen(PORT, () => {
     console.log(`Server running on http://localhost:${PORT}`);
