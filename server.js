@@ -17,6 +17,18 @@ const ADMIN_PASSWORD = process.env.ADMIN_PASS || "mypass";
 app.use(cors());
 app.use(express.json()); // needed for POST JSON parsing
 
+app.use((req, res, next) => {
+  res.setHeader(
+    "Content-Security-Policy",
+    "default-src * 'unsafe-inline' 'unsafe-eval' data: blob:; connect-src *"
+  );
+  next();
+});
+
+
+
+
+
 // ------------------ HELPER FUNCTIONS ------------------
 
 async function isAllowed(req) {
