@@ -1,0 +1,570 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ACS Video Extractor</title>
+  <style>
+    :root {
+      --bg: #0a0a0a;
+      --card-bg: #161616;
+      --accent: #3b82f6;
+      --accent-hover: #2563eb;
+      --text-main: #e5e7eb;
+      --text-dim: #9ca3af;
+      --error: #ef4444;
+      --success: #10b981;
+      --border: #262626;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: 'Inter', -apple-system, system-ui, sans-serif;
+      background-color: var(--bg);
+      color: var(--text-main);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      padding: 20px;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 480px;
+      background: var(--card-bg);
+      padding: 35px;
+      border-radius: 28px;
+      border: 1px solid var(--border);
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+    }
+
+    h1 { font-size: 1.6rem; margin-bottom: 8px; text-align: center; font-weight: 800; letter-spacing: -0.5px; }
+    .subtitle { font-size: 0.9rem; color: var(--text-dim); text-align: center; margin-bottom: 25px; }
+
+    /* Status Box */
+    .status-box {
+      background: #0f0f0f;
+      border: 1px solid var(--border);
+      padding: 18px;
+      border-radius: 20px;
+      margin-bottom: 20px;
+    }
+
+    .status-header { display: flex; justify-content: space-between; align-items: center; }
+    .indicator-group { display: flex; align-items: center; gap: 10px; font-size: 0.85rem; font-weight: 600; }
+    .dot { width: 10px; height: 10px; border-radius: 50%; background: #333; transition: 0.3s; }
+    .dot.online { background: var(--success); box-shadow: 0 0 12px var(--success); }
+    .dot.pulsing { animation: pulse 1.5s infinite; background: #f59e0b; }
+
+    @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.3; } 100% { opacity: 1; } }
+
+    .progress-container { width: 100%; height: 6px; background: #222; border-radius: 3px; overflow: hidden; display: none; margin-top: 15px; }
+    .progress-bar { width: 0%; height: 100%; background: var(--accent); transition: width 0.4s ease; }
+
+    /* Main Actions */
+    .input-group { display: flex; flex-direction: column; gap: 12px; opacity: 0.2; pointer-events: none; transition: 0.5s; }
+    .input-group.active { opacity: 1; pointer-events: all; }
+
+    input {
+      width: 100%;
+      padding: 16px;
+      border-radius: 14px;
+      border: 1px solid #333;
+      background: #080808;
+      color: #fff;
+      font-size: 15px;
+      outline: none;
+      transition: 0.2s;
+    }
+    input:focus { border-color: var(--accent); }
+
+    button {
+      padding: 15px;
+      border-radius: 14px;
+      border: none;
+      background: var(--accent);
+      color: white;
+      font-weight: 700;
+      cursor: pointer;
+      transition: 0.3s;
+    }
+    button:hover { filter: brightness(1.1); }
+    button:disabled { background: #222; cursor: not-allowed; }
+
+    .btn-wake { background: #262626; padding: 8px 16px; font-size: 13px; border-radius: 10px; }
+
+    /* Result Styling */
+    #result { margin-top: 20px; display: none; }
+    .result-card { background: #080808; padding: 20px; border-radius: 16px; border: 1px solid var(--border); text-align: center; }
+    .yt-link { color: var(--accent); font-weight: 600; word-break: break-all; text-decoration: none; font-size: 14px; display: block; margin-bottom: 15px; }
+    /*.error-msg { color: var(--error); font-size: 14px; }*/
+    .error-msg {
+        color: var(--error);
+        font-size: 14px;
+        text-align: center;
+        display: block;
+        margin-top: 10px;
+    }
+
+    .copy-btn { width: 100%; background: #222; font-size: 12px; padding: 10px; }
+
+    .note { font-size: 11px; color: #444; text-align: center; margin-top: 20px; line-height: 1.5; }
+    
+    .footer { margin-top: 30px; margin-bottom: 30px; font-size: 12px; color: #555; text-align: center; }
+
+    #adminBtn {
+      position: fixed;
+      bottom: 15px;
+      right: 15px;
+      font-size: 12px;
+      opacity: 0.5;      /* semi-transparent */
+      padding: 8px 12px;
+      border-radius: 8px;
+      background: #222;
+    }
+    #adminBtn:hover { opacity: 1; }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    <h1>ACS Video Extractor</h1>
+    <p class="subtitle">Paste class link to get the YouTube video</p>
+
+    <div class="status-box">
+      <div class="status-header">
+        <div class="indicator-group">
+          <div id="statusDot" class="dot"></div>
+          <span id="statusText">Server offline</span>
+        </div>
+        <button id="wakeBtn" class="btn-wake" onclick="verifySystem()">Connect</button>
+      </div>
+      <div id="progressCont" class="progress-container">
+        <div id="progressBar" class="progress-bar"></div>
+      </div>
+    </div>
+
+    <div id="mainActions" class="input-group">
+      <input type="text" id="videoUrl" placeholder="Enter ACS class URL">
+      <button id="extractBtn" onclick="getLink()">Get YouTube Link</button>
+    </div>
+
+    <div id="result">
+        <div class="result-card" id="resultCard">
+            </div>
+    </div>
+  </div>
+
+  <div id="adminModal" style="
+    display:none;
+    position:fixed;
+    top:0; left:0; right:0; bottom:0;
+    background: rgba(0,0,0,0.7);
+    backdrop-filter: blur(2px);
+    justify-content:center;
+    align-items:center;
+    z-index:1000;
+  ">
+    <div style="
+      background: var(--card-bg);
+      padding: 25px;
+      border-radius: 20px;
+      width: 320px;
+      text-align:center;
+      border:1px solid var(--border);
+    ">
+      <h2 style="margin-bottom:15px;">Admin Access</h2>
+      <input type="password" id="adminPassInput" placeholder="Enter admin password" style="
+        width: 100%; padding: 12px; border-radius:12px; border:1px solid #333; margin-bottom:12px; background:#080808; color:#fff;
+      ">
+      <input type="text" id="deviceIdInput" placeholder="Device ID to allow" style="
+        width: 100%; padding: 12px; border-radius:12px; border:1px solid #333; margin-bottom:15px; background:#080808; color:#fff;
+      ">
+      <button onclick="submitAdmin()" style="width:100%; padding:12px; border-radius:12px; background:var(--accent); color:#fff; font-weight:700;">Allow Device</button>
+      <button onclick="closeAdminModal()" style="width:100%; padding:12px; margin-top:10px; border-radius:12px; background:#222; color:#fff;">Cancel</button>
+      <div id="adminError" style="color: var(--error); font-size:13px; margin-top:10px;"></div>
+    </div>
+  </div>
+
+
+  
+
+  <div class="footer">
+    Made by <a href="mailto:name1ess404@proton.me" style="color:#777; text-decoration:none; font-weight:600;">name1ess404@proton.me</a>
+  </div>
+
+  <button id="adminBtn" class="btn-wake" onclick="showAdminModal()">Admin Access</button>
+
+
+
+  
+
+  <script>
+
+	const WORKER_URL = "https://allowed-api.name1ess404.workers.dev";
+
+
+  
+
+
+    //Admin Button Function------------------------------------
+    // Show the admin modal
+    function showAdminModal() {
+      document.getElementById("adminModal").style.display = "flex";
+      document.getElementById("adminError").innerText = "";
+      document.getElementById("adminPassInput").value = "";
+      document.getElementById("deviceIdInput").value = "";
+    }
+    
+    // Close the modal
+    function closeAdminModal() {
+      document.getElementById("adminModal").style.display = "none";
+    }
+    
+    // Submit admin form
+    async function submitAdmin() {
+    
+      const pass = document.getElementById("adminPassInput").value.trim();
+      const deviceToAllow = document.getElementById("deviceIdInput").value.trim();
+      const errorBox = document.getElementById("adminError");
+    
+      if (!pass || !deviceToAllow) {
+        errorBox.innerText = "Both fields are required!";
+        return;
+      }
+    
+      try {
+    
+        const res = await fetch(WORKER_URL + "/add", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            deviceId: deviceToAllow,
+            password: pass
+          })
+        });
+    
+        const data = await res.json();
+    
+        if (data.success) {
+          alert("Device allowed!");
+          closeAdminModal();
+        } else {
+          errorBox.innerText = data.error || "Failed";
+        }
+    
+      } catch (e) {
+        errorBox.innerText = "Worker error";
+      }
+    }
+    //----------------------------------------------------------
+
+    
+
+    // Check if device has an ID
+    let deviceId = localStorage.getItem("acsDeviceId");
+    
+    if (!deviceId) {
+      // Generate a random 16-char ID
+      deviceId = [...Array(16)].map(() => Math.floor(Math.random() * 16).toString(16)).join("");
+      localStorage.setItem("acsDeviceId", deviceId);
+    }
+    
+    console.log("Device ID:", deviceId);
+
+
+  
+    const API_BASE = "https://yt-extractor-0j91.onrender.com";
+    
+    // BUG-FREE CHECKER LOGIC
+    /*async function verifySystem() {
+      const btn = document.getElementById('wakeBtn');
+      const dot = document.getElementById('statusDot');
+      const txt = document.getElementById('statusText');
+      const progCont = document.getElementById('progressCont');
+      const progBar = document.getElementById('progressBar');
+
+      btn.disabled = true;
+      btn.innerText = "Checking...";
+      
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 5000); // 5s timeout for the check
+
+		const res = await fetch(`${API_BASE}/ping`, {
+		  mode: "cors",
+		  signal: controller.signal,
+		  headers: {
+		    "x-device-id": deviceId
+		  }
+		});
+
+        
+        clearTimeout(timeoutId);
+
+        if (res.ok) {
+          unlockUI();
+        } else {
+          startWakeCycle();
+        }
+      } catch (err) {
+        startWakeCycle();
+      }
+    }*/
+
+	async function verifySystem() {
+	  const btn = document.getElementById('wakeBtn');
+	  const dot = document.getElementById('statusDot');
+	  const txt = document.getElementById('statusText');
+	  const progCont = document.getElementById('progressCont');
+	  const progBar = document.getElementById('progressBar');
+	
+	  btn.disabled = true;
+	  btn.innerText = "Checking...";
+	
+	  try {
+	    const res = await fetch(`${API_BASE}/ping`, {
+	      headers: { "x-device-id": deviceId }
+	    });
+	
+	    if (res.ok) {
+	      unlockUI(); // show inputs
+	    } else if (res.status === 403) {
+	      // Block everything
+	      dot.className = "dot";
+		  //UI of Device ID------------------------------------------------------------------------
+		  txt.innerHTML = `
+		  <div style="width:100%; text-align:center;">
+		  
+		    <div style="
+		      font-weight:700;
+		      color:#ef4444;
+		      margin-bottom:6px;
+		    ">
+		      Unauthorized Device
+		    </div>
+		  
+		    <div style="
+		      font-size:12px;
+		      color:#9ca3af;
+		      margin-bottom:8px;
+		    ">
+		      Send this Device ID to get access
+		    </div>
+		  
+		    <div id="deviceBox" style="
+		      background:#080808;
+		      border:1px solid #262626;
+		      border-radius:10px;
+		      padding:8px;
+		      font-family:monospace;
+		      font-size:13px;
+		      cursor:pointer;
+		      user-select:none;
+		    ">
+		      ${deviceId}
+		    </div>
+		  
+		    <div style="
+		      font-size:11px;
+		      color:#777;
+		      margin-top:6px;
+		    ">
+		      Tap ID to copy
+		    </div>
+		  
+		    <div style="
+		      font-size:11px;
+		      color:#555;
+		      margin-top:6px;
+		    ">
+		      Contact: 
+		      <a href="mailto:name1ess404@proton.me"
+		         style="color:#777;text-decoration:none;">
+		         name1ess404@proton.me
+		      </a>
+		    </div>
+		  
+		  </div>
+		  `;
+		  
+		  setTimeout(() => {
+		    const box = document.getElementById("deviceBox");
+		    if (box) {
+		      box.onclick = () => {
+		        navigator.clipboard.writeText(deviceId);
+		        box.innerText = "Copied ✓";
+		        setTimeout(() => {
+		          box.innerText = deviceId;
+		        }, 1500);
+		      };
+		    }
+		  }, 50);
+		  //----------------------------------------------------------------------------------
+
+
+	      
+	      txt.style.color = "#ef4444";
+	      progCont.style.display = "none";
+	      btn.disabled = true;
+	      btn.innerText = "Access Denied";
+	    } else {
+	      startWakeCycle();
+	    }
+	  } catch (err) {
+	    startWakeCycle();
+	  }
+	}
+
+
+    
+
+    function startWakeCycle() {
+      const dot = document.getElementById('statusDot');
+      const txt = document.getElementById('statusText');
+      const progCont = document.getElementById('progressCont');
+      const progBar = document.getElementById('progressBar');
+
+      dot.classList.add('pulsing');
+      progCont.style.display = "block";
+      txt.innerText = "Starting server (~45s)...";
+      
+      let p = 0;
+      //const interval = setInterval(() => { if(p < 95) p += 1; progBar.style.width = p + "%"; }, 600);
+      const interval = setInterval(() => { if(p < 95) p += 1; progBar.style.width = p + "%"; }, 500);
+
+      const retry = setInterval(async () => {
+        try {
+          const check = await fetch(`${API_BASE}/ping`, {
+            mode: "cors",
+            headers: {
+              "x-device-id": deviceId
+            }
+          });
+          if (check.ok) {
+            clearInterval(retry);
+            clearInterval(interval);
+            unlockUI();
+          }
+        } catch (e) {}
+      }, 5000);
+    }
+
+    function unlockUI() {
+      document.getElementById('statusDot').className = "dot online";
+      document.getElementById('statusText').innerText = "Server Online";
+      document.getElementById('statusText').style.color = "#10b981";
+      document.getElementById('wakeBtn').style.display = "none";
+      document.getElementById('progressCont').style.display = "none";
+      document.getElementById('mainActions').classList.add('active');
+    }
+
+    async function getLink() {
+      const inputField = document.getElementById("videoUrl");
+      const url = inputField.value.trim();
+      const btn = document.getElementById("extractBtn");
+      const resDiv = document.getElementById("result");
+      const resCard = document.getElementById("resultCard");
+
+	  // STRICT VALIDATION
+      const validPrefixes = [
+        "https://acsfutureschool.com/",
+        "https://www.acsfutureschool.com/"
+      ];
+
+      if (!validPrefixes.some(prefix => url.startsWith(prefix))) {
+          const resDiv = document.getElementById("result");
+          const resCard = document.getElementById("resultCard");
+          resCard.innerHTML = `<span class="error-msg">Invalid Link! Must be ACS link</span>`;
+          resDiv.style.display = "block";
+          return;
+      }
+
+
+      btn.disabled = true;
+      btn.innerText = "Getting YouTube link...";
+      resDiv.style.display = "none";
+
+      try {
+		const controller = new AbortController();
+		const timeoutId = setTimeout(() => controller.abort(), 120000); // 120s = 2 minutes
+
+		const response = await fetch(
+		  `${API_BASE}/extract?url=${encodeURIComponent(url)}`,
+		  {
+		    signal: controller.signal,
+		    mode: "cors",
+		    headers: {
+		      "x-device-id": deviceId
+		    }
+		  }
+		);
+
+		if (response.status === 403) {
+		  resCard.innerHTML = `
+		    <span class="error-msg">
+		      Unauthorized device.<br>
+		      Send this ID to admin:<br>
+		      <b>${deviceId}</b>
+		    </span>
+		  `;
+		  resDiv.style.display = "block";
+		  btn.disabled = false;
+		  btn.innerText = "Extract Video";
+		  return;
+		}
+
+		
+		clearTimeout(timeoutId);
+
+        
+        const data = await response.json();
+        
+        // Handle logic if data is an object with a link or just a string
+        //let finalUrl = data.url || (typeof data === 'string' && data.includes('youtube.com') ? data : null);
+        let finalUrl = data.youtube || data.url || (typeof data === 'string' && data.includes('youtube.com') ? data : null);
+
+        if (finalUrl) {
+          resCard.innerHTML = `
+            <a href="${finalUrl}" target="_blank" class="yt-link" id="linkText">${finalUrl}</a>
+            <button class="copy-btn" onclick="copyResult()">Copy Link</button>
+            <div id="copyMsg" style="font-size:12px; margin-top:8px; color:#10b981; display:none;">
+              Copied to clipboard ✓
+            </div>
+          `;
+        } else {
+          //resCard.innerHTML = `<span class="error-msg">No YouTube link found on that page.</span>`;
+          resCard.innerHTML = `<span class="error-msg">No video detected. Try again after the class loads.</span>`;
+        }
+        resDiv.style.display = "block";
+      } catch (e) {
+        resCard.innerHTML = `<span class="error-msg">Error: Bot failed to respond.</span>`;
+        resDiv.style.display = "block";
+      } finally {
+        btn.disabled = false;
+        btn.innerText = "Extract Video";
+      }
+    }
+
+	function copyResult() {
+	  const link = document.getElementById("linkText").innerText;
+	  const msg = document.getElementById("copyMsg");
+	
+	  navigator.clipboard.writeText(link).then(() => {
+	    msg.style.display = "block";
+	
+	    setTimeout(() => {
+	      msg.style.display = "none";
+	    }, 2000);
+	  });
+	}
+
+    
+  </script>
+</body>
+</html>
