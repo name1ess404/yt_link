@@ -5,11 +5,14 @@ const WORKER_URL = "https://allowed-api.name1ess404.workers.dev";
 const express = require("express");
 const puppeteer = require("puppeteer");
 const cors = require('cors');
+const path = require("path");
 
 const fetch = global.fetch;
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+
+app.use(express.static(path.join(__dirname, "public")));
 
 // ------------------ CONFIG ------------------
 const ADMIN_PASSWORD = process.env.ADMIN_PASS || "mypass";
@@ -20,7 +23,7 @@ app.use(express.json()); // needed for POST JSON parsing
 app.use((req, res, next) => {
   res.setHeader(
     "Content-Security-Policy",
-    "default-src * 'unsafe-inline' 'unsafe-eval' data: blob:; connect-src *"
+    "default-src 'self' https: data: blob: 'unsafe-inline' 'unsafe-eval'; connect-src * https://allowed-api.name1ess404.workers.dev https://yt-extractor-0j91.onrender.com"
   );
   next();
 });
