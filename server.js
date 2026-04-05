@@ -40,8 +40,7 @@ async function initBrowser() {
         "--disable-sync",
         "--disable-default-apps",
         "--no-first-run",
-        "--no-zygote",
-        "--single-process"
+        "--no-zygote"
       ]
     });
   }
@@ -84,100 +83,77 @@ app.get("/ping", async (req, res) => {
   res.send("OK");
 });
 
-// EXTRACT
+// ------------------ EXTRACT ------------------
 app.get("/extract", async (req, res) => {
+  if (!(await isAllowed(req))) {
+    return res.status(403).json({ error: "UNAUTHORIZED", message: "Device not allowed" });
+  }
+
+  const classUrl = req.query.url;
+  if (!classUrl) return res.status(400).json({ error: "Missing url parameter" });
+
+  // ✅ CACHE CHECK
+  if (cache.has(classUrl)) {
+    return res.json({ youtube: cache.get(classUrl) });
+  }
+
+  let page;
+
+  try {
     await initBrowser();
 
-    if (!(await isAllowed(req))) {
-        return res.status(403).json({ error: "UNAUTHORIZED" });
+    page = await browser.newPage();
+
+    await page.setDefaultNavigationTimeout(90000);
+    await page.setDefaultTimeout(90000);
+
+    const cookies = JSON.parse(process.env.COOKIES_JSON || "[]");
+    if (cookies.length) await page.setCookie(...cookies);
+
+    await page.goto(classUrl, {
+      waitUntil: "domcontentloaded",
+      timeout: 90000
+    });
+
+    // ✅ ORIGINAL WORKING LOGIC
+    await page.waitForFunction(() => {
+      const iframe = document.querySelector("iframe");
+      return iframe && iframe.src && iframe.src.includes("youtube");
+    }, { timeout: 90000 });
+
+    const iframeSrc = await page.evaluate(() => {
+      const iframe = document.querySelector("iframe");
+      return iframe ? iframe.src : null;
+    });
+
+    if (!iframeSrc) {
+      return res.status(404).json({ error: "No iframe found" });
     }
 
-    const classUrl = req.query.url;
-    if (!classUrl) {
-        return res.status(400).json({ error: "Missing url" });
+    let url = iframeSrc;
+
+    if (url.includes("/embed/")) {
+      const id = url.split("/embed/")[1].split("?")[0];
+      url = "https://www.youtube.com/watch?v=" + id;
     }
 
-    if (cache.has(classUrl)) {
-        return res.json({ youtube: cache.get(classUrl) });
+    // ✅ CACHE SAVE
+    addToCache(classUrl, url);
+
+    res.json({ youtube: url });
+
+  } catch (err) {
+    console.error("ERROR OCCURRED:", err);
+    res.status(500).json({
+      error: "Something went wrong",
+      details: err.message
+    });
+
+  } finally {
+    if (page && !page.isClosed()) {
+      await page.close();
     }
-
-    let page;
-
-    try {
-        page = await browser.newPage();
-
-        await page.setDefaultNavigationTimeout(90000);
-        await page.setDefaultTimeout(90000);
-
-        const cookies = JSON.parse(process.env.COOKIES_JSON || "[]");
-        if (cookies.length) await page.setCookie(...cookies);
-
-        // 🔥 IMPORTANT CHANGE
-        await page.goto(classUrl, {
-            waitUntil: "networkidle2", // WAIT FULL LOAD
-            timeout: 90000
-        });
-
-        // 🔥 WAIT UNTIL URL IS STILL /live/ (not redirected)
-        await page.waitForFunction(() => {
-            return window.location.href.includes("/live/");
-        }, { timeout: 90000 });
-
-        // 🔥 WAIT UNTIL CORRECT IFRAME APPEARS (NOT HOMEPAGE ONE)
-        await page.waitForFunction(() => {
-            const iframes = document.querySelectorAll("iframe");
-            return Array.from(iframes).some(f => 
-                f.src && 
-                f.src.includes("youtube") &&
-                f.src.includes("embed")
-            );
-        }, { timeout: 90000 });
-
-        // GET ALL IFRAMES
-        const iframeUrls = await page.evaluate(() => {
-            return Array.from(document.querySelectorAll("iframe"))
-                .map(f => f.src)
-                .filter(src => src && src.includes("youtube"));
-        });
-
-        if (!iframeUrls.length) {
-            return res.status(404).json({ error: "No YouTube iframe found" });
-        }
-
-        // 🔥 VERY IMPORTANT: pick iframe that belongs to THIS PAGE
-        const correctIframe = iframeUrls.find(src => 
-            src.includes("acsfutureschool.com") // bound to page
-        ) || iframeUrls[0];
-
-        let videoId = null;
-
-        try {
-            const urlObj = new URL(correctIframe);
-
-            if (urlObj.pathname.includes("/embed/")) {
-                videoId = urlObj.pathname.split("/embed/")[1].split("/")[0];
-            }
-
-        } catch {}
-
-        if (!videoId) {
-            return res.status(500).json({ error: "Failed to extract video ID" });
-        }
-
-        const finalUrl = `https://www.youtube.com/watch?v=${videoId}`;
-
-        addToCache(classUrl, finalUrl);
-
-        res.json({ youtube: finalUrl });
-
-    } catch (err) {
-        console.error(err);
-        res.status(500).json({ error: "Extraction failed" });
-    } finally {
-        if (page && !page.isClosed()) {
-            await page.close();
-        }
-    }
+  }
 });
 
 // ------------------ START ------------------
