@@ -108,7 +108,7 @@ app.get("/extract", async (req, res) => {
   try {
     page = await browser.newPage();
 
-    // 🚀 BLOCK HEAVY STUFF
+    // 🔥 BLOCK ONLY HEAVY STUFF (safe)
     await page.setRequestInterception(true);
     page.on("request", (req) => {
       const type = req.resourceType();
@@ -130,14 +130,30 @@ app.get("/extract", async (req, res) => {
       timeout: 90000
     });
 
+    // wait until ANY youtube iframe appears
     await page.waitForFunction(() => {
-      const iframe = document.querySelector("iframe");
-      return iframe && iframe.src && iframe.src.includes("youtube");
+      return Array.from(document.querySelectorAll("iframe"))
+        .some(f => f.src.includes("youtube.com/embed"));
     }, { timeout: 90000 });
 
+    // ✅ GET CORRECT IFRAME
     const iframeSrc = await page.evaluate(() => {
-      const iframe = document.querySelector("iframe");
-      return iframe ? iframe.src : null;
+      const iframes = Array.from(document.querySelectorAll("iframe"));
+
+      // try best match first
+      let ytFrame = iframes.find(f =>
+        f.src.includes("youtube.com/embed") &&
+        f.src.includes("enablejsapi")
+      );
+
+      // fallback if not found
+      if (!ytFrame) {
+        ytFrame = iframes.find(f =>
+          f.src.includes("youtube.com/embed")
+        );
+      }
+
+      return ytFrame ? ytFrame.src : null;
     });
 
     if (!iframeSrc) {
