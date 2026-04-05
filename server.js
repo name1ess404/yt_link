@@ -112,7 +112,7 @@ app.get("/extract", async (req, res) => {
     await page.setRequestInterception(true);
     page.on("request", (req) => {
       const type = req.resourceType();
-      if (type === "image" || type === "stylesheet" || type === "font") {
+      if (type === "image" || type === "font") {
         req.abort();
       } else {
         req.continue();
