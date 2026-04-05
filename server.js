@@ -14,9 +14,6 @@ app.use(express.static(path.join(__dirname, "public")));
 app.use(cors());
 app.use(express.json());
 
-// ------------------ CONFIG ------------------
-const ADMIN_PASSWORD = process.env.ADMIN_PASS || "mypass";
-
 // ------------------ CSP ------------------
 app.use((req, res, next) => {
   res.setHeader(
@@ -36,15 +33,19 @@ async function initBrowser() {
       args: [
         "--no-sandbox",
         "--disable-setuid-sandbox",
-        "--disable-dev-shm-usage"
+        "--disable-dev-shm-usage",
+        "--disable-gpu",
+        "--disable-extensions",
+        "--disable-background-networking",
+        "--disable-sync",
+        "--disable-default-apps",
+        "--no-first-run",
+        "--no-zygote",
+        "--single-process"
       ]
     });
   }
 }
-
-(async () => {
-  await initBrowser();
-})();
 
 // ------------------ CACHE ------------------
 const cache = new Map();
@@ -78,7 +79,7 @@ async function isAllowed(req) {
 // PING
 app.get("/ping", async (req, res) => {
   if (!(await isAllowed(req))) {
-    return res.status(403).json({ error: "UNAUTHORIZED", message: "Device not allowed" });
+    return res.status(403).json({ error: "UNAUTHORIZED" });
   }
   res.send("OK");
 });
@@ -88,16 +89,16 @@ app.get("/extract", async (req, res) => {
   await initBrowser();
 
   if (!(await isAllowed(req))) {
-    return res.status(403).json({ error: "UNAUTHORIZED", message: "Device not allowed" });
+    return res.status(403).json({ error: "UNAUTHORIZED" });
   }
 
   const classUrl = req.query.url;
 
   if (!classUrl) {
-    return res.status(400).json({ error: "Missing url parameter" });
+    return res.status(400).json({ error: "Missing url" });
   }
 
-  // CACHE CHECK
+  // CACHE
   if (cache.has(classUrl)) {
     return res.json({ youtube: cache.get(classUrl) });
   }
@@ -107,13 +108,27 @@ app.get("/extract", async (req, res) => {
   try {
     page = await browser.newPage();
 
+    // 🚀 BLOCK HEAVY STUFF
+    await page.setRequestInterception(true);
+    page.on("request", (req) => {
+      const type = req.resourceType();
+      if (type === "image" || type === "stylesheet" || type === "font") {
+        req.abort();
+      } else {
+        req.continue();
+      }
+    });
+
     await page.setDefaultNavigationTimeout(90000);
     await page.setDefaultTimeout(90000);
 
     const cookies = JSON.parse(process.env.COOKIES_JSON || "[]");
     if (cookies.length) await page.setCookie(...cookies);
 
-    await page.goto(classUrl, { waitUntil: "domcontentloaded", timeout: 90000 });
+    await page.goto(classUrl, {
+      waitUntil: "domcontentloaded",
+      timeout: 90000
+    });
 
     await page.waitForFunction(() => {
       const iframe = document.querySelector("iframe");
@@ -141,8 +156,8 @@ app.get("/extract", async (req, res) => {
     res.json({ youtube: url });
 
   } catch (err) {
-    console.error("ERROR OCCURRED:", err);
-    res.status(500).json({ error: "Something went wrong", details: err.message });
+    console.error("ERROR:", err);
+    res.status(500).json({ error: "Something went wrong" });
 
   } finally {
     if (page && !page.isClosed()) {
