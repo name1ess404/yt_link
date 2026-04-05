@@ -108,7 +108,7 @@ app.get("/extract", async (req, res) => {
   try {
     page = await browser.newPage();
 
-    // 🔥 BLOCK ONLY HEAVY STUFF (safe)
+    // 🔥 BLOCK ONLY HEAVY STUFF
     await page.setRequestInterception(true);
     page.on("request", (req) => {
       const type = req.resourceType();
@@ -130,30 +130,36 @@ app.get("/extract", async (req, res) => {
       timeout: 90000
     });
 
-    // wait until ANY youtube iframe appears
+    // wait for ANY youtube iframe
     await page.waitForFunction(() => {
       return Array.from(document.querySelectorAll("iframe"))
         .some(f => f.src.includes("youtube.com/embed"));
     }, { timeout: 90000 });
 
-    // ✅ GET CORRECT IFRAME
+    // ✅ PICK THE CORRECT (BIGGEST) IFRAME
     const iframeSrc = await page.evaluate(() => {
       const iframes = Array.from(document.querySelectorAll("iframe"));
 
-      // try best match first
-      let ytFrame = iframes.find(f =>
-        f.src.includes("youtube.com/embed") &&
-        f.src.includes("enablejsapi")
+      const ytFrames = iframes.filter(f =>
+        f.src.includes("youtube.com/embed")
       );
 
-      // fallback if not found
-      if (!ytFrame) {
-        ytFrame = iframes.find(f =>
-          f.src.includes("youtube.com/embed")
-        );
-      }
+      if (ytFrames.length === 0) return null;
 
-      return ytFrame ? ytFrame.src : null;
+      let bestFrame = null;
+      let maxArea = 0;
+
+      ytFrames.forEach(f => {
+        const rect = f.getBoundingClientRect();
+        const area = rect.width * rect.height;
+
+        if (area > maxArea) {
+          maxArea = area;
+          bestFrame = f;
+        }
+      });
+
+      return bestFrame ? bestFrame.src : null;
     });
 
     if (!iframeSrc) {
